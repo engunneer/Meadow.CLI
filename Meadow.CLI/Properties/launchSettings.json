@@ -2,7 +2,7 @@
   "profiles": {
     "AppDeploy": {
       "commandName": "Project",
-      "commandLineArgs": "app deploy -f /Users/briankim/gh/OtaSample/bin/Debug/netstandard2.1/App.dll"
+      "commandLineArgs": "app deploy -f C:\\repos\\wilderness\\Meadow.Core.Samples\\Source\\IO\\AnalogInputArray\\bin\\Debug\\netstandard2.1\\App.dll"
     },
     "CloudLogin": {
       "commandName": "Project",

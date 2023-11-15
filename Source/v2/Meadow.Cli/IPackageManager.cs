@@ -4,7 +4,7 @@ namespace Meadow.CLI;
 
 public interface IPackageManager
 {
-    List<string> GetDependencies(FileInfo file);
+    List<string> GetDependencies(FileInfo file, string runtimePath);
 
     bool BuildApplication(
         string projectFilePath,
@@ -13,10 +13,9 @@ public interface IPackageManager
         ILogger? logger = null,
         CancellationToken? cancellationToken = null);
 
-    Task TrimApplication(
+    Task<IEnumerable<string>?> TrimApplication(
         FileInfo applicationFilePath,
-        bool includePdbs = false,
-        IList<string>? noLink = null,
+        BuildOptions options,
         ILogger? logger = null,
         CancellationToken? cancellationToken = null);
 
@@ -32,7 +31,6 @@ public interface IPackageManager
     List<string>? AssemblyDependencies { get; set; }
 
     IEnumerable<string>? TrimmedDependencies { get; set; }
-    bool Trimmed { get; set; }
 
     string? RuntimeVersion { get; set; }
     string? MeadowAssembliesPath { get; }

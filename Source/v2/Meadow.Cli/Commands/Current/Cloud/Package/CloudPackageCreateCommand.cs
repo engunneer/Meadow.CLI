@@ -1,9 +1,9 @@
 ﻿using CliFx.Attributes;
-using Meadow.CLI;
 using Meadow.Cloud;
 using Meadow.Cloud.Identity;
 using Meadow.Software;
 using Microsoft.Extensions.Logging;
+using static Meadow.Software.FileManager;
 
 namespace Meadow.CLI.Commands.DeviceManagement;
 
@@ -54,7 +54,7 @@ public class CloudPackageCreateCommand : BaseCloudCommand<CloudPackageCreateComm
             return;
         }
 
-        var candidates = PackageManager.GetAvailableBuiltConfigurations(ProjectPath, "App.dll");
+        var candidates = PackageManager.GetAvailableBuiltConfigurations(ProjectPath, false, "App.dll");
 
         if (candidates.Length == 0)
         {
@@ -62,13 +62,16 @@ public class CloudPackageCreateCommand : BaseCloudCommand<CloudPackageCreateComm
             return;
         }
 
-        var store = _fileManager.Firmware["Meadow F7"];
+        var store = _fileManager.Firmware[StoreNames.MeadowF7];
         await store.Refresh();
         var osVersion = store?.DefaultPackage?.Version ?? "unknown";
 
         var file = candidates.OrderByDescending(c => c.LastWriteTime).First();        // trim
-        Logger?.LogInformation($"Trimming application...");
-        await _packageManager.TrimApplication(file, cancellationToken: CancellationToken);
+        Logger?.LogInformation($"Trimming application against runtime v{osVersion}...");
+
+        var options = new BuildOptions(store!.DefaultPackage!.GetFullyQualifiedPath(store!.DefaultPackage!.BclFolder ?? string.Empty));
+
+        await _packageManager.TrimApplication(file, options, cancellationToken: CancellationToken);
 
         // package
         var packageDir = Path.Combine(file.Directory?.FullName ?? string.Empty, PackageManager.PackageOutputDirectoryName);

@@ -1,6 +1,6 @@
-﻿using Meadow.CLI;
-using Meadow.Software;
+﻿using Meadow.Software;
 using Microsoft.Extensions.Logging;
+using static Meadow.Software.FileManager;
 
 namespace Meadow.CLI.Commands.DeviceManagement;
 
@@ -21,6 +21,6 @@ public abstract class BaseFileCommand<T> : BaseSettingsCommand<T>
 
         // for now we only support F7
         // TODO: add switch and support for other platforms
-        Collection = FileManager.Firmware["Meadow F7"];
+        Collection = FileManager.Firmware[StoreNames.MeadowF7];
     }
 }

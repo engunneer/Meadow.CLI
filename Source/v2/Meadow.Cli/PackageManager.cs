@@ -119,10 +119,9 @@ public partial class PackageManager : IPackageManager
         return success;
     }
 
-    public async Task TrimApplication(
+    public async Task<IEnumerable<string>?> TrimApplication(
         FileInfo applicationFilePath,
-        bool includePdbs = false,
-        IList<string>? noLink = null,
+        BuildOptions options,
         ILogger? logger = null,
         CancellationToken? cancellationToken = null)
     {
@@ -130,8 +129,6 @@ public partial class PackageManager : IPackageManager
         {
             throw new FileNotFoundException($"{applicationFilePath} not found");
         }
-
-        Trimmed = false;
 
         // does an app.build.yaml file exist?
         var buildOptionsFile = Path.Combine(
@@ -145,38 +142,33 @@ public partial class PackageManager : IPackageManager
             var deserializer = new DeserializerBuilder()
                 .IgnoreUnmatchedProperties()
                 .Build();
+
             var opts = deserializer.Deserialize<BuildOptions>(yaml);
 
-            if (opts.Deploy?.NoLink != null && opts.Deploy?.NoLink.Count > 0)
-            {
-                noLink = opts.Deploy.NoLink;
-            }
-            if (opts.Deploy?.IncludePDBs != null)
-            {
-                includePdbs = opts.Deploy.IncludePDBs.Value;
-            }
+            options.MergeWith(opts);
         }
 
-        AssemblyDependencies = GetDependencies(applicationFilePath)
+        var dependencies = GetDependencies(
+            applicationFilePath,
+            options.RuntimeFolder)
+            .Where(d => !d.Contains("App.dll", StringComparison.InvariantCultureIgnoreCase))
             .ToList();
 
         try
         {
-            TrimmedDependencies = await TrimDependencies(
+            var results = await TrimDependencies(
                 applicationFilePath,
-                AssemblyDependencies,
-                noLink,
-                logger,
-                includePdbs,
-                verbose: false);
+                dependencies,
+                options,
+                logger);
+
+            return results;
         }
         catch (Exception)
         {
             logger?.LogError($"Trimming FAILED. Falling back to untrimmed dependencies");
-            Trimmed = false;
+            return dependencies;
         }
-
-        Trimmed = true;
     }
 
     public const string PackageMetadataFileName = "info.json";
@@ -244,7 +236,7 @@ public partial class PackageManager : IPackageManager
         archive.CreateEntryFromFile(fromFile, entryPath);
     }
 
-    public static FileInfo[] GetAvailableBuiltConfigurations(string rootFolder, string appName = "App.dll")
+    public static FileInfo[] GetAvailableBuiltConfigurations(string rootFolder, bool includePostLinkInSearch = true, string appName = "App.dll")
     {
         if (!Directory.Exists(rootFolder)) throw new FileNotFoundException();
 
@@ -261,7 +253,12 @@ public partial class PackageManager : IPackageManager
             {
                 var shortname = System.IO.Path.GetFileName(dir);
 
-                if (shortname == PackageManager.PostLinkDirectoryName || shortname == PackageManager.PreLinkDirectoryName)
+                if (!includePostLinkInSearch && shortname == PackageManager.PostLinkDirectoryName)
+                {
+                    continue;
+                }
+
+                if (shortname == PackageManager.PreLinkDirectoryName)
                 {
                     continue;
                 }

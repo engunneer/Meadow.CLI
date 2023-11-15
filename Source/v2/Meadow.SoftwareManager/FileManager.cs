@@ -7,6 +7,11 @@ namespace Meadow.Software;
 
 public class FileManager
 {
+    public static class StoreNames
+    {
+        public const string MeadowF7 = "Meadow F7";
+    }
+
     public static readonly string WildernessTempFolderPath = Path.Combine(
                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                "WildernessLabs",
@@ -27,7 +32,7 @@ public class FileManager
     {
         Firmware = new FirmwareStore();
         var f7Collection = new F7FirmwarePackageCollection();
-        Firmware.AddCollection("Meadow F7", f7Collection);
+        Firmware.AddCollection(StoreNames.MeadowF7, f7Collection);
     }
 
     public async Task Refresh()

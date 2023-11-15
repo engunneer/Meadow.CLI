@@ -1,5 +1,6 @@
 ﻿using CliFx.Attributes;
 using Meadow.Hcom;
+using Meadow.Software;
 using Microsoft.Extensions.Logging;
 
 namespace Meadow.CLI.Commands.DeviceManagement;
@@ -7,6 +8,8 @@ namespace Meadow.CLI.Commands.DeviceManagement;
 [Command("app run", Description = "Builds, trims and deploys a Meadow application to a target device")]
 public class AppRunCommand : BaseAppCommand<AppRunCommand>
 {
+    private FileManager _fileManager;
+
     [CommandOption("no-prefix", 'n', IsRequired = false, Description = "When set, the message source prefix (e.g. 'stdout>') is suppressed during 'listen'")]
     public bool NoPrefix { get; set; }
 
@@ -16,9 +19,10 @@ public class AppRunCommand : BaseAppCommand<AppRunCommand>
     [CommandParameter(0, Name = "Path to folder containing the built application", IsRequired = false)]
     public string? Path { get; set; } = default!;
 
-    public AppRunCommand(IPackageManager packageManager, MeadowConnectionManager connectionManager, ILoggerFactory loggerFactory)
+    public AppRunCommand(IPackageManager packageManager, FileManager fileManager, MeadowConnectionManager connectionManager, ILoggerFactory loggerFactory)
         : base(packageManager, connectionManager, loggerFactory)
     {
+        _fileManager = fileManager;
     }
 
     protected override async ValueTask ExecuteCommand()
@@ -61,7 +65,7 @@ public class AppRunCommand : BaseAppCommand<AppRunCommand>
                 s.CommandTimeoutSeconds = 60;
             }
 
-            var deployApplication = new AppDeployCommand(_packageManager, ConnectionManager, LoggerFactory!)
+            var deployApplication = new AppDeployCommand(_packageManager, _fileManager, ConnectionManager, LoggerFactory!)
             {
                 Path = path
             };

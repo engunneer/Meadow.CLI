@@ -1,8 +1,6 @@
-﻿using System.Configuration;
-using CliFx.Attributes;
+﻿using CliFx.Attributes;
 using Meadow.Cloud;
 using Meadow.Cloud.Identity;
-using Meadow.Hcom;
 using Microsoft.Extensions.Logging;
 
 namespace Meadow.CLI.Commands.DeviceManagement;
@@ -40,7 +38,7 @@ public class CloudPackageUploadCommand : BaseCloudCommand<CloudPackageUploadComm
     {
         if (string.IsNullOrEmpty(MpakPath))
         {
-            var candidates = PackageManager.GetAvailableBuiltConfigurations(Environment.CurrentDirectory, "App.dll");
+            var candidates = PackageManager.GetAvailableBuiltConfigurations(Environment.CurrentDirectory, true, "App.dll");
 
             if (candidates.Length == 0)
             {

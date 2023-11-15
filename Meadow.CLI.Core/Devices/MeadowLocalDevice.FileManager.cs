@@ -655,6 +655,11 @@ namespace Meadow.CLI.Core.Devices
                     // .Where(x => dllLinkIngoreList.Any(f => x.Contains(f)) == false)
                     .ToList();
 
+                foreach (var dp in dependencies)
+                {
+                    Debug.WriteLine(dp);
+                }
+
                 var trimmedDependencies = await AssemblyManager.TrimDependencies(fileName, directoryName, dependencies, noLink, Logger, includePdbs: includePdbs, verbose: verbose);
 
                 //add local files (this includes App.exe)

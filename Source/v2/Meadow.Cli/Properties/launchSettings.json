@@ -165,15 +165,15 @@
     },
     "App Build": {
       "commandName": "Project",
-      "commandLineArgs": "app build F:\\temp\\MeadowApplication1"
+      "commandLineArgs": "app build C:\\repos\\wilderness\\Meadow.Core.Samples\\Source\\IO\\AnalogInputArray"
     },
     "App Build Debug": {
       "commandName": "Project",
-      "commandLineArgs": "app build F:\\temp\\MeadowApplication1 -c Debug"
+      "commandLineArgs": "app build C:\\repos\\wilderness\\Meadow.Core.Samples\\Source\\IO\\AnalogInputArray -c Debug"
     },
     "App Trim": {
       "commandName": "Project",
-      "commandLineArgs": "app trim F:\\temp\\MeadowApplication1"
+      "commandLineArgs": "app trim C:\\repos\\wilderness\\Meadow.Core.Samples\\Source\\IO\\AnalogInputArray"
     },
     "Dfu Install": {
       "commandName": "Project",
@@ -183,9 +183,13 @@
       "commandName": "Project",
       "commandLineArgs": "dfu install -v 0.10"
     },
+    "App Deploy (no trim)": {
+      "commandName": "Project",
+      "commandLineArgs": "app deploy C:\\repos\\wilderness\\Meadow.Core.Samples\\Source\\IO\\AnalogInputArray --no-trim"
+    },
     "App Deploy (project folder)": {
       "commandName": "Project",
-      "commandLineArgs": "app deploy F:\\temp\\MeadowApplication1"
+      "commandLineArgs": "app deploy C:\\repos\\wilderness\\Meadow.Core.Samples\\Source\\IO\\AnalogInputArray"
     },
     "App Deploy (untrimmed output)": {
       "commandName": "Project",

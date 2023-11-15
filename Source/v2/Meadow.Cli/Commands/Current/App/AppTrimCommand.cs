@@ -1,28 +1,33 @@
-﻿using System.Threading;
-using CliFx.Attributes;
-using Meadow.CLI;
+﻿using CliFx.Attributes;
+using Meadow.Software;
 using Microsoft.Extensions.Logging;
+using static Meadow.Software.FileManager;
 
 namespace Meadow.CLI.Commands.DeviceManagement;
 
 [Command("app trim", Description = "Runs an already-compiled Meadow application through reference trimming")]
 public class AppTrimCommand : BaseAppCommand<AppTrimCommand>
 {
+    private FileManager _fileManager;
+
     [CommandOption('c', Description = "The build configuration to trim", IsRequired = false)]
     public string? Configuration { get; set; }
 
     [CommandParameter(0, Name = "Path to project file", IsRequired = false)]
     public string? Path { get; set; } = default!;
 
-    public AppTrimCommand(IPackageManager packageManager, MeadowConnectionManager connectionManager, ILoggerFactory loggerFactory)
+    public AppTrimCommand(
+        IPackageManager packageManager,
+        FileManager fileManager,
+        MeadowConnectionManager connectionManager,
+        ILoggerFactory loggerFactory)
         : base(packageManager, connectionManager, loggerFactory)
     {
+        _fileManager = fileManager;
     }
 
     protected override async ValueTask ExecuteCommand()
     {
-        await base.ExecuteCommand();
-
         string path = Path == null
             ? Environment.CurrentDirectory
             : Path;
@@ -40,7 +45,7 @@ public class AppTrimCommand : BaseAppCommand<AppTrimCommand>
             }
 
             // it's a directory - we need to determine the latest build (they might have a Debug and a Release config)
-            var candidates = PackageManager.GetAvailableBuiltConfigurations(path, "App.dll");
+            var candidates = PackageManager.GetAvailableBuiltConfigurations(path, false, "App.dll");
 
             if (candidates.Length == 0)
             {
@@ -55,21 +60,43 @@ public class AppTrimCommand : BaseAppCommand<AppTrimCommand>
             file = new FileInfo(path);
         }
 
+        string? targetRuntime;
+
         // Find RuntimeVersion
         if (Connection != null)
         {
             var info = await Connection.GetDeviceInfo(CancellationToken);
 
-            _packageManager.RuntimeVersion = info?.RuntimeVersion;
+            targetRuntime = info?.RuntimeVersion;
 
             Logger?.LogInformation($"Using runtime files from {_packageManager.MeadowAssembliesPath}");
 
             // Avoid double reporting.
             DetachMessageHandlers(Connection);
         }
+        else
+        {
+            // no device is attached - we need to choose a runtime version
+            // for now we only support F7
+            var store = _fileManager.Firmware[StoreNames.MeadowF7];
+            await store.Refresh();
 
-        // TODO: support `nolink` command line args
-        await _packageManager.TrimApplication(file, false, null, Logger, CancellationToken)
-            .WithSpinner(Console!, 250);
+            targetRuntime = store!.DefaultPackage!.GetFullyQualifiedPath(store!.DefaultPackage!.Runtime ?? string.Empty);
+        }
+
+        if (targetRuntime == null)
+        {
+            Logger?.LogError("Cannot determine runtime to build against.");
+        }
+        else
+        {
+            // TODO: support a command line arg for runtime version
+            // TODO: support `nolink` command line args
+
+            var options = new BuildOptions(targetRuntime);
+
+            await _packageManager.TrimApplication(file, options, Logger, CancellationToken)
+                .WithSpinner(Console!, 250);
+        }
     }
 }

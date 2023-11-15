@@ -13,9 +13,6 @@ public partial class PackageManager
     public const string PreLinkDirectoryName = "prelink_bin";
     public const string PackageOutputDirectoryName = "mpak";
 
-
-    private readonly List<string> dependencyMap = new();
-
     private string? _meadowAssembliesPath;
 
     public string? MeadowAssembliesPath
@@ -61,11 +58,14 @@ public partial class PackageManager
     public List<string>? AssemblyDependencies { get; set; }
 
     public IEnumerable<string>? TrimmedDependencies { get; set; }
-    public bool Trimmed { get; set; } = false;
 
     public string? RuntimeVersion { get; set; }
 
-    public async Task<IEnumerable<string>?> TrimDependencies(FileInfo file, List<string> dependencies, IList<string>? noLink, ILogger? logger, bool includePdbs, bool verbose = false, string? linkerOptions = null)
+    public async Task<IEnumerable<string>?> TrimDependencies(
+        FileInfo file,
+        List<string> dependencies,
+        BuildOptions options,
+        ILogger? logger)
     {
         var directoryName = file.DirectoryName;
         if (!string.IsNullOrEmpty(directoryName))
@@ -89,7 +89,7 @@ public partial class PackageManager
                             Path.Combine(prelink_dir, Path.GetFileName(Path.GetFileName(dependency))),
                             overwrite: true);
 
-                if (includePdbs)
+                if (options.Deploy.IncludePDBs)
                 {
                     var pdbFile = Path.ChangeExtension(dependency, "pdb");
                     if (File.Exists(pdbFile))
@@ -119,30 +119,49 @@ public partial class PackageManager
                     throw new FileNotFoundException("Cannot run trimming operation. illink.dll not found.");
                 }
 
-                if (linkerOptions != null)
+                if (!File.Exists(descriptor_path))
                 {
-                    var fi = new FileInfo(linkerOptions);
+                    logger?.LogWarning($"Cannot find 'meadow_link.xml'");
+                }
+
+                if (options.LinkerOptionsFile != null)
+                {
+                    var fi = new FileInfo(options.LinkerOptionsFile);
 
                     if (fi.Exists)
                     {
-                        logger?.LogInformation($"Using linker options from '{linkerOptions}'");
+                        logger?.LogInformation($"Using linker options from '{options.LinkerOptionsFile}'");
                     }
                     else
                     {
-                        logger?.LogWarning($"Linker options file '{linkerOptions}' not found");
+                        logger?.LogWarning($"Linker options file '{options.LinkerOptionsFile}' not found");
                     }
                 }
 
+                //                options.Deploy.NoLink.Add("mscorlib");
 
                 // add in any run-time no-link arguments
                 var no_link_args = string.Empty;
-                if (noLink != null)
+                if (options.Deploy.NoLink != null)
                 {
                     // no-link options want just the assembly name (i.e. no ".dll" extension)
-                    no_link_args = string.Join(" ", noLink.Select(o => $"-p copy \"{o.Replace(".dll", string.Empty)}\""));
+                    no_link_args = string.Join(" ", options.Deploy.NoLink.Select(o => $"-p copy \"{o.Replace(".dll", string.Empty)}\""));
                 }
 
-                var monolinker_args = $"\"{illinker_path}\" -x \"{descriptor_path}\" {no_link_args}  --skip-unresolved --deterministic --keep-facades true --ignore-descriptors true -b true -c link -o \"{postlink_dir}\" -r \"{prelink_app}\" -a \"{prelink_os}\" -d \"{prelink_dir}\"";
+                var monolinker_args =
+                    $"\"{illinker_path}\"" +
+                    $" -x \"{descriptor_path}\"" +
+                    $" {no_link_args}" +
+                    $" --skip-unresolved" +
+                    $" --deterministic" +
+                    $" --keep-facades true" +
+                    $" --ignore-descriptors true" +
+                    $" -b true" +
+                    $" -c link" +
+                    $" -o \"{postlink_dir}\"" +
+                    $" -r \"{prelink_app}\"" +
+                    $" -a \"{prelink_os}\"" +
+                    $" -d \"{prelink_dir}\"";
 
                 logger?.LogInformation($"Trimming assemblies associated with {fileName} to reduce upload size (this may take a few seconds)...");
                 if (!string.IsNullOrWhiteSpace(no_link_args))
@@ -165,7 +184,7 @@ public partial class PackageManager
                     using (StreamReader stdOutReader = process.StandardOutput)
                     {
                         stdOutReaderResult = await stdOutReader.ReadToEndAsync();
-                        if (verbose)
+                        if (options.VerboseOutput)
                         {
                             logger?.LogInformation("StandardOutput Contains: " + stdOutReaderResult);
                         }
@@ -203,16 +222,57 @@ public partial class PackageManager
         }
     }
 
-    public List<string> GetDependencies(FileInfo file)
+    public List<string> GetDeps(string file, string searchPaths)
     {
-        dependencyMap.Clear();
+        return GetDeps(file, new List<string>(new string[] { searchPaths }));
+    }
+
+    public List<string> GetDeps(string file, List<string> searchPaths)
+    {
+        string? FindAssembly(string assemblyName, List<string> searchPaths)
+        {
+            var match = searchPaths.FirstOrDefault(p => File.Exists(Path.Combine(p, $"{assemblyName}.dll")));
+
+            if (match == null) return null;
+            return Path.Combine(match, $"{assemblyName}.dll");
+        }
+
+        var result = new List<string>();
+
+        var path = Path.GetDirectoryName(file);
+        if (path != null && !searchPaths.Contains(path))
+        {
+            searchPaths.Add(path);
+        }
+
+        using var definition = AssemblyDefinition.ReadAssembly(file);
+
+        var references = definition.MainModule.AssemblyReferences;
+
+        foreach (var r in references)
+        {
+            var f = FindAssembly(r.Name, searchPaths);
+            if (f != null)
+            {
+                result.Add(f);
+
+                result.AddRange(GetDeps(f, searchPaths));
+            }
+        }
+
+        return result;
+    }
+
+    public List<string> GetDependencies(FileInfo file, string runtimePath)
+    {
+        var dependencyMap = new List<string>();
 
         var directoryName = file.DirectoryName;
         if (!string.IsNullOrEmpty(directoryName))
         {
-            var refs = GetAssemblyReferences(file.Name, directoryName);
+            var refs = GetAssemblyReferences(file.Name, directoryName, runtimePath);
 
-            var dependencies = GetDependencies(refs, dependencyMap, directoryName);
+            var dependencies = GetDependencies(refs, dependencyMap, directoryName, runtimePath);
 
             return dependencies;
         }
@@ -222,7 +282,8 @@ public partial class PackageManager
         }
     }
 
-    private (Collection<AssemblyNameReference>? References, string? ResolvedPath) GetAssemblyReferences(string fileName, string path)
+
+    private (Collection<AssemblyNameReference>? References, string? ResolvedPath) GetAssemblyReferences(string fileName, string path, string runtimePath)
     {
         static string? ResolvePath(string fileName, string path)
         {
@@ -235,9 +296,9 @@ public partial class PackageManager
             return File.Exists(attemptedPath) ? attemptedPath : null;
         }
 
-        if (!string.IsNullOrEmpty(MeadowAssembliesPath))
+        if (!string.IsNullOrEmpty(runtimePath))
         {
-            string? resolvedPath = ResolvePath(fileName, MeadowAssembliesPath) ?? ResolvePath(fileName, path);
+            string? resolvedPath = ResolvePath(fileName, runtimePath) ?? ResolvePath(fileName, path);
 
             if (resolvedPath is null)
             {
@@ -267,7 +328,7 @@ public partial class PackageManager
         }
     }
 
-    private List<string> GetDependencies((Collection<AssemblyNameReference>? References, string? ResolvedPath) references, List<string> dependencyMap, string folderPath)
+    private List<string> GetDependencies((Collection<AssemblyNameReference>? References, string? ResolvedPath) references, List<string> dependencyMap, string folderPath, string runtimePath)
     {
         if (references.ResolvedPath == null || dependencyMap.Contains(references.ResolvedPath))
             return dependencyMap;
@@ -278,12 +339,12 @@ public partial class PackageManager
         {
             foreach (var ar in references.References)
             {
-                var namedRefs = GetAssemblyReferences(ar.Name, folderPath);
+                var namedRefs = GetAssemblyReferences(ar.Name, folderPath, runtimePath);
 
                 if (namedRefs.References == null)
                     continue;
 
-                GetDependencies(namedRefs, dependencyMap, folderPath);
+                GetDependencies(namedRefs, dependencyMap, folderPath, runtimePath);
             }
         }
 
