@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 
@@ -25,4 +26,10 @@ public interface IFirmwarePackageCollection : IEnumerable<FirmwarePackage>
     Task<bool> RetrievePackage(string version, bool overwrite = false);
 
     string PackageFileRoot { get; }
+
+    public FirmwarePackage? GetPackageForVersion(string version)
+    {
+        return this.FirstOrDefault(p => p.Version == version);
+    }
+
 }

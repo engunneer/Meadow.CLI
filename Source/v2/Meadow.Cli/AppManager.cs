@@ -37,9 +37,13 @@ public static class AppManager
 
     public static Dictionary<string, uint> GenerateDeployList(
         string localBinaryDirectory,
+        string? additionalFileDirectory,
+        IEnumerable<string> dependencies,
         bool includePdbs)
     {
         var result = new Dictionary<string, uint>();
+
+        var dependentFiles = dependencies.ToList();
 
         foreach (var file in Directory.GetFiles(localBinaryDirectory))
         {
@@ -56,6 +60,58 @@ public static class AppManager
             {
                 var crc = GetFileCrc(file);
                 result.Add(file, crc);
+            }
+
+            // if the file exists in the dependencies, remove it
+            // (i.e. binary directory overrides dependency directory)
+            var dep = dependentFiles.FirstOrDefault(f => Path.GetFileName(f) == Path.GetFileName(file));
+            if (dep != null)
+            {
+                dependentFiles.Remove(dep);
+            }
+        }
+
+        foreach (var dependentFile in dependentFiles)
+        {
+            var crc = GetFileCrc(dependentFile);
+            result.Add(dependentFile, crc);
+        }
+
+        if (additionalFileDirectory != null && additionalFileDirectory != localBinaryDirectory)
+        {
+            // add any files that are in the "additional file directory" but not in the list we've built so far
+            // this allows the addition of things like configs, data, etc. that are not in the dependency tree
+            foreach (var file in Directory.GetFiles(additionalFileDirectory))
+            {
+                if (DoNotDeploy.Contains(Path.GetFileName(file)))
+                {
+                    continue;
+                }
+
+                // do not add DLL, EXE, PDB or doc XML
+                switch (Path.GetExtension(file))
+                {
+                    case ".dll":
+                    case ".exe":
+                    case ".pdb":
+                        continue;
+                    case ".xml":
+                        // if there's a matching DLL, skip
+                        var root = Path.GetFileNameWithoutExtension(file);
+                        var dll = result.Keys.FirstOrDefault(f => Path.GetFileName(f) == $"{root}.dll");
+                        if (dll != null)
+                        {
+                            continue;
+                        }
+                        break;
+                }
+
+                var existing = result.Keys.FirstOrDefault(f => Path.GetFileName(f) == Path.GetFileName(file));
+                if (existing == null)
+                {
+                    var crc = GetFileCrc(file);
+                    result.Add(file, crc);
+                }
             }
         }
 

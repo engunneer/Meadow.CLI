@@ -90,44 +90,87 @@ public class AppDeployCommand : BaseAppCommand<AppDeployCommand>
                 return;
             }
 
-            var targetDirectory = file.DirectoryName;
+            var binarySourceDirectory = file.DirectoryName;
+            var additionalFileDirectory = file.DirectoryName;
 
             var store = _fileManager.Firmware[StoreNames.MeadowF7];
             await store.Refresh();
-            var targetRuntime = store!.DefaultPackage!.GetFullyQualifiedPath(store!.DefaultPackage!.BclFolder ?? string.Empty);
 
-            if (NoTrim == false)
+            // determine the runtime on the device for dev=pendencies
+            var info = await Connection.Device!.GetDeviceInfo(CancellationToken);
+
+            if (info == null || info.RuntimeVersion == null)
             {
-                var options = new BuildOptions(targetRuntime);
+                Logger?.LogError($"Unable to query device's runtime version information");
+                return;
+            }
 
-                var trimmedFiles = await _packageManager.TrimApplication(file, options, Logger, CancellationToken);
+            var package = store.GetPackageForVersion(info.RuntimeVersion ?? string.Empty);
 
-                // the output is in a different location
-                targetDirectory = PackageManager
+            if (package == null)
+            {
+                Logger?.LogError($"Device has runtime {info.RuntimeVersion} but no local match was found.  Try downloading it.");
+                return;
+            }
+
+            var runtimeFolder = package.GetFullyQualifiedPath(package.BclFolder ?? string.Empty);
+
+            if (NoTrim)
+            {
+                // does a postlink folder exist?
+                var postlink = System.IO.Path.Combine(file.DirectoryName, PackageManager.PostLinkDirectoryName);
+
+                if (Directory.Exists(postlink))
+                {
+                    binarySourceDirectory = postlink;
+
+                    // dev note: do *not* change to the App in postlink - we want the dependency tree of the original
+                    //file = new FileInfo(System.IO.Path.Combine(postlink, "App.dll"));
+                }
+            }
+            else
+            {
+                var options = new BuildOptions(runtimeFolder);
+
+                using (var spinner = ConsoleSpinner.Create(Console))
+                {
+                    await _packageManager.TrimApplication(file, options, Logger, CancellationToken);
+                }
+
+                // the output is in a different location, so get the newly built folder
+                binarySourceDirectory = PackageManager
                     .GetAvailableBuiltConfigurations(path, true, "App.dll")
                     .OrderByDescending(c => c.LastWriteTime)
                     .First()
-                    .FullName;
+                    .DirectoryName ?? string.Empty;
+
+                // dev note: do *not* change to the App in postlink - we want the dependency tree of the original
+                //file = new FileInfo(System.IO.Path.Combine(postlink, "App.dll"));
             }
 
-            // TODO: add support for args to control deploy PDBs (y/n)
+            Logger?.LogInformation("Creating a list of files to deploy...");
+            Dictionary<string, uint> localFiles;
 
-            var localFiles = AppManager.GenerateDeployList(
-                targetDirectory,
-                targetDirectory.Contains("Debug"));
+            using (var spinner = ConsoleSpinner.Create(Console))
+            {
+                // determine what files to deploy
+                var dependencies = _packageManager.GetDependencies(file, runtimeFolder);
 
-            //var localFiles = await AppManager.GenerateDeployList(
-            //    _packageManager,
-            //    targetDirectory,
-            //    targetDirectory.Contains("Debug"),
-            //    Logger,
-            //    CancellationToken)
-            //    .WithSpinner(Console!, 250);
+                // TODO: add support for args to control deploy PDBs (y/n)
 
-            Console?.Output.WriteAsync("\n");
+                // TODO: add any "special" files to deploy - i.e. files in the build output that aren't in the 
+                // dependency tree (like app configs, data files, etc)
+                var buildOutputFolder = System.IO.Path.GetDirectoryName(binarySourceDirectory);
+
+                localFiles = AppManager.GenerateDeployList(
+                    binarySourceDirectory,
+                    additionalFileDirectory,
+                    dependencies ?? new List<string>(),
+                    binarySourceDirectory.Contains("Debug"));
+
+            }
 
             Connection.FileWriteProgress += Connection_FileWriteProgress;
-
 
             await AppManager.DeployFilesToDevice(Connection, localFiles, Logger, CancellationToken);
             Console?.Output.WriteAsync("\n");

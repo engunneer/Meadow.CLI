@@ -34,7 +34,8 @@
     },
     "FileWrite": {
       "commandName": "Project",
-      "commandLineArgs": "file write -f \"f:\\temp\\test.txt\""
+      "commandLineArgs": "file write -f \"C:\\Users\\ctack\\AppData\\Local\\WildernessLabs\\Firmware\\1.5.0.4\\meadow_assemblies\\System.Threading.Tasks.Extensions.dll",
+      "
     },
     "FlashErase": {
       "commandName": "Project",
