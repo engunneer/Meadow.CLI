@@ -718,6 +718,13 @@ namespace Meadow.CLI.Core.Devices
                     }
                 }
 
+                foreach (var f in files.Keys)
+                {
+                    var n = $"{System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(f))}\\{System.IO.Path.GetFileName(f)}: 0x{files[f]:x8}";
+
+                    Debug.WriteLine(n);
+                }
+
                 // write new files
                 foreach (var file in files)
                 {

@@ -1,6 +1,7 @@
 ﻿using CliFx.Attributes;
 using Meadow.Software;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using static Meadow.Software.FileManager;
 
 namespace Meadow.CLI.Commands.DeviceManagement;
@@ -168,6 +169,13 @@ public class AppDeployCommand : BaseAppCommand<AppDeployCommand>
                     dependencies ?? new List<string>(),
                     binarySourceDirectory.Contains("Debug"));
 
+            }
+
+            foreach (var f in localFiles.Keys)
+            {
+                var n = $"{System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(f))}\\{System.IO.Path.GetFileName(f)}: 0x{localFiles[f]:x8}";
+
+                Debug.WriteLine(n);
             }
 
             Connection.FileWriteProgress += Connection_FileWriteProgress;
