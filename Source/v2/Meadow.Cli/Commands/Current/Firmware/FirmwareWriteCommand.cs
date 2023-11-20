@@ -32,6 +32,9 @@ public class FirmwareWriteCommand : BaseDeviceCommand<FirmwareWriteCommand>
     [CommandOption("file", 'f', IsRequired = false, Description = "Path to OS, Runtime or ESP file")]
     public string? Path { get; set; } = default!;
 
+    [CommandOption("address", 'a', IsRequired = false, Description = "Address location to write the file to")]
+    public int? Address { get; set; } = default!;
+
     private FileManager FileManager { get; }
     private ISettingsManager Settings { get; }
 
@@ -300,7 +303,14 @@ public class FirmwareWriteCommand : BaseDeviceCommand<FirmwareWriteCommand>
             connection.FileWriteProgress += (s, e) =>
             {
                 var p = (e.completed / (double)e.total) * 100d;
-                Console?.Output.WriteAsync($"Writing {e.fileName}: {p:0}%     \r");
+                if (p == 100.0)
+                {
+                    Console?.Output.WriteAsync($"{Environment.NewLine}");
+                }
+                else
+                {
+                    Console?.Output.WriteAsync($"Writing {e.fileName}: {p:0}%     \r");
+                }
             };
 
             if (Files.Contains(FirmwareType.OS))
@@ -322,16 +332,15 @@ public class FirmwareWriteCommand : BaseDeviceCommand<FirmwareWriteCommand>
                 string? runtime;
                 if (!string.IsNullOrEmpty(Path))
                 {
-                    Logger?.LogInformation($"{Environment.NewLine}Writing Runtime {Path}...");
                     runtime = Path;
                 }
                 else
                 {
-                    Logger?.LogInformation($"{Environment.NewLine}Writing Runtime {package.Version}...");
-
-                    // get the path to the runtime file
+                    // get the path to the runtime bin file
                     runtime = package.Runtime;
                 }
+
+                Logger?.LogInformation($"{Environment.NewLine}Writing Runtime {runtime}...");
 
                 if (string.IsNullOrEmpty(runtime))
                     runtime = string.Empty;
@@ -352,23 +361,41 @@ public class FirmwareWriteCommand : BaseDeviceCommand<FirmwareWriteCommand>
 
             if (Files.Contains(FirmwareType.ESP))
             {
-                Logger?.LogInformation($"{Environment.NewLine}Writing Coprocessor files...");
-
-                string[]? fileList;
-                if (package.CoprocApplication != null
-                    && package.CoprocBootloader != null
-                    && package.CoprocPartitionTable != null)
+                string? coProcessorFilePath;
+                if (!string.IsNullOrEmpty(Path))
                 {
-                    fileList = new string[]
-                        {
-                        package.GetFullyQualifiedPath(package.CoprocApplication),
-                        package.GetFullyQualifiedPath(package.CoprocBootloader),
-                        package.GetFullyQualifiedPath(package.CoprocPartitionTable),
-                        };
+                    // use passed in path
+                    coProcessorFilePath = Path;
                 }
                 else
                 {
-                    fileList = Array.Empty<string>();
+                    // get the default path to the coprocessor bin file
+                    coProcessorFilePath = package.CoprocApplication;
+                }
+
+                Logger?.LogInformation($"{Environment.NewLine}Writing Coprocessor file {coProcessorFilePath}...");
+
+                string[]? fileList = Array.Empty<string>();
+                if (coProcessorFilePath != null
+                    && package.CoprocBootloader != null
+                    && package.CoprocPartitionTable != null)
+                {
+                    if (!string.IsNullOrEmpty(Path))
+                    {
+                        fileList = new string[]
+                        {
+                            package.GetFullyQualifiedPath(coProcessorFilePath),
+                        };
+                    }
+                    else
+                    {
+                        fileList = new string[]
+                        {
+                            package.GetFullyQualifiedPath(coProcessorFilePath),
+                            package.GetFullyQualifiedPath(package.CoprocBootloader),
+                            package.GetFullyQualifiedPath(package.CoprocPartitionTable),
+                        };
+                    }
                 }
 
                 await connection.Device.WriteCoprocessorFiles(fileList, CancellationToken);
