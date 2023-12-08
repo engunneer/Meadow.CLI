@@ -19,6 +19,7 @@ namespace Meadow.Hcom
             }
         }
 
+        // DEV NOTE: these strings are hard-coded because they are the values that come from the F7 HCOM request.  Don't change them!
         public string? Product => this["Product"];
         public string? Model => this["Model"];
         public string? ProcessorType => this["ProcessorType"];
@@ -40,59 +41,52 @@ namespace Meadow.Hcom
 
         public override string ToString()
         {
+            var info = new Dictionary<string, Dictionary<string, string>>(); // section, value name, value
+
+            var board = new Dictionary<string, string>();
+            if (Product != null) board.Add("Product", Product);
+            if (Model != null) board.Add("Model", Model);
+            if (HardwareVersion != null) board.Add("Hardware version", HardwareVersion);
+            if (DeviceName != null) board.Add("Device name", DeviceName);
+            if (board.Count > 0)
+            {
+                info.Add("Device Information", board);
+            }
+
+            var hardware = new Dictionary<string, string>();
+            if (ProcessorType != null) hardware.Add("Processor type", ProcessorType);
+            if (ProcessorId != null) hardware.Add("ID", ProcessorId);
+            if (SerialNumber != null) hardware.Add("Serial number", SerialNumber);
+            if (CoprocessorType != null) hardware.Add("Coprocessor type", CoprocessorType);
+            if (!string.IsNullOrEmpty(MacAddress) && MacAddress != UNKNOWN_MAC_ADDRESS) hardware.Add("WiFi", MacAddress);
+            if (!string.IsNullOrEmpty(SoftAPMacAddress) && MacAddress != UNKNOWN_MAC_ADDRESS) hardware.Add("AP", SoftAPMacAddress);
+
+            if (hardware.Count > 0)
+            {
+                info.Add("Hardware Information", hardware);
+            }
+
+            var firmware = new Dictionary<string, string>();
+            if (OsVersion != null) firmware.Add("OS", OsVersion);
+            if (RuntimeVersion != null) firmware.Add("Runtime", RuntimeVersion);
+            if (CoprocessorOsVersion != null) firmware.Add("Coprocessor", CoprocessorOsVersion);
+            firmware.Add("Protocol", Protocol.HCOM_PROTOCOL_HCOM_VERSION_NUMBER.ToString());
+            if (firmware.Count > 0)
+            {
+                info.Add("Firmware Information", firmware);
+            }
+
             var deviceInfo = new StringBuilder();
 
-            if (Product != null && Product.Contains(" by Wilderness Labs"))
+            foreach (var section in info.Keys)
             {
-                deviceInfo.AppendLine(Product);
-            }
-            else
-            {
-                deviceInfo.AppendLine($"{Product} by Wilderness Labs");
-            }
+                deviceInfo.AppendLine(section);
 
-            deviceInfo.AppendLine("Board Information ");
-            deviceInfo.AppendLine($"    Model: {Model}");
-            deviceInfo.AppendLine($"    Hardware version: {HardwareVersion}");
-            deviceInfo.AppendLine($"    Device name: {DeviceName}");
-            deviceInfo.AppendLine();
-            deviceInfo.AppendLine($"Hardware Information ");
-            deviceInfo.AppendLine($"    Processor type: {ProcessorType}");
-            deviceInfo.AppendLine($"    ID: {ProcessorId}");
-            deviceInfo.AppendLine($"    Serial number: {SerialNumber}");
-            deviceInfo.AppendLine($"    Coprocessor type: {CoprocessorType}");
-
-            string macAddresses = string.Empty;
-            int macCount = 0;
-            if (!string.IsNullOrEmpty(MacAddress) && MacAddress != UNKNOWN_MAC_ADDRESS)
-            {
-                macCount++;
-                macAddresses += $"\tWiFi: {MacAddress}{Environment.NewLine}";
-            }
-            if (!string.IsNullOrEmpty(SoftAPMacAddress) && SoftAPMacAddress != UNKNOWN_MAC_ADDRESS)
-            {
-                macCount++;
-                macAddresses += $"\tAP: {SoftAPMacAddress}{Environment.NewLine}";
-            }
-            if (macCount > 0)
-            {
-                if (macCount > 1)
+                foreach (var value in info[section])
                 {
-                    deviceInfo.AppendLine("    MAC Addresses - ");
+                    deviceInfo.AppendLine($"\t{value.Key}: {value.Value}");
                 }
-                else
-                {
-                    deviceInfo.AppendLine("    MAC Address - ");
-                }
-                deviceInfo.AppendLine($"{macAddresses}");
             }
-
-            deviceInfo.AppendLine();
-            deviceInfo.AppendLine($"Firmware Versions ");
-            deviceInfo.AppendLine($"    OS: {OsVersion}");
-            deviceInfo.AppendLine($"    Runtime: {RuntimeVersion}");
-            deviceInfo.AppendLine($"    Coprocessor: {CoprocessorOsVersion}");
-            deviceInfo.AppendLine($"    Protocol: {Protocol.HCOM_PROTOCOL_HCOM_VERSION_NUMBER}");
 
             return deviceInfo.ToString();
         }

@@ -7,6 +7,7 @@ public class TcpConnection : ConnectionBase
 {
     private HttpClient _client;
     private string _baseUri;
+    private string? _publicKey;
 
     public override string Name => _baseUri;
 
@@ -53,19 +54,25 @@ public class TcpConnection : ConnectionBase
 
     public override async Task<DeviceInfo?> GetDeviceInfo(CancellationToken? cancellationToken = null)
     {
+        var response = await GetDeviceInfoFromService(cancellationToken);
+
+        if (response != null)
+        {
+            return new DeviceInfo(response.ToDictionary());
+        }
+
+        return null;
+    }
+
+    private async Task<DeviceInfoHttpResponse?> GetDeviceInfoFromService(CancellationToken? cancellationToken = null)
+    {
         var response = await _client.GetAsync($"{_baseUri}/api/info");
 
         if (response.IsSuccessStatusCode)
         {
-            var r = JsonSerializer.Deserialize<DeviceInfoHttpResponse>(await response.Content.ReadAsStringAsync());
-            if (r != null)
-            {
-                return new DeviceInfo(r.ToDictionary());
-            }
-            else
-            {
-                return null;
-            }
+            var info = JsonSerializer.Deserialize<DeviceInfoHttpResponse>(await response.Content.ReadAsStringAsync());
+            _publicKey = info?.PublicKey;
+            return info;
         }
         else
         {
@@ -182,9 +189,17 @@ public class TcpConnection : ConnectionBase
         throw new NotImplementedException();
     }
 
-    public override Task<string> GetPublicKey(CancellationToken? cancellationToken = null)
+    public override async Task<string> GetPublicKey(CancellationToken? cancellationToken = null)
     {
-        throw new NotImplementedException();
+        // if we've gotten device info, we already have it
+        if (_publicKey != null)
+        {
+            return _publicKey;
+        }
+
+        var info = await GetDeviceInfoFromService(cancellationToken);
+
+        return _publicKey ?? string.Empty;
     }
 
     public override Task StartDebugging(int port, ILogger? logger, CancellationToken? cancellationToken)
