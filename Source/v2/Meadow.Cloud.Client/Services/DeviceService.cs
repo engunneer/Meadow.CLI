@@ -17,7 +17,7 @@ public class DeviceService : CloudServiceBase
         dynamic payload = new
         {
             orgId,
-            id,
+            id = id.ToUpper(),
             publicKey,
             collectionId,
             name

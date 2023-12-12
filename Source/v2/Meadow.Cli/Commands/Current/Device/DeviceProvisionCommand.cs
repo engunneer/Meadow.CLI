@@ -94,7 +94,7 @@ public class DeviceProvisionCommand : BaseDeviceCommand<DeviceProvisionCommand>
         var provisioningID = !string.IsNullOrWhiteSpace(info?.ProcessorId) ? info.ProcessorId : info?.SerialNumber;
         var provisioningName = !string.IsNullOrWhiteSpace(Name) ? Name : info?.DeviceName;
 
-        var result = await _deviceService.AddDevice(org.Id!, provisioningID!, publicKey, CollectionId, provisioningName, Host, CancellationToken);
+        var result = await _deviceService.AddDevice(org.Id!, provisioningID!.ToUpper(), publicKey, CollectionId, provisioningName, Host, CancellationToken);
 
         if (result.isSuccess)
         {

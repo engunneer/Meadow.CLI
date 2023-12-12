@@ -58,10 +58,9 @@ internal class DeviceInfoHttpResponse
             { "CoprocessorVersion", $"{ServiceName} v{ServiceVersion}" },
             { "SerialNo", DeviceInfo.SerialNumber },
             { "DeviceName", DeviceInfo.DeviceName },
-            { "OSVersion", DeviceInfo.OsRelease },
-            { "OsName", DeviceInfo.OsName },
+            { "OSVersion", $"{DeviceInfo.OsName} {DeviceInfo.OsRelease}" },
             { "Product", DeviceInfo.Platform },
-            { "Model", DeviceInfo.DeviceName },
+//            { "Model", DeviceInfo.OsName },
             { "ProcessorType", DeviceInfo.Machine }
         };
         return d;
