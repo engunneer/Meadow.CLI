@@ -22,5 +22,9 @@ public class DeviceInfoCommand : BaseDeviceCommand<DeviceInfoCommand>
         {
             Logger?.LogInformation(deviceInfo.ToString());
         }
+        else
+        {
+            throw new CommandException("Failed to get device infomation");
+        }
     }
 }

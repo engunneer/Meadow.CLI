@@ -36,8 +36,7 @@ public class DfuInstallCommand : BaseSettingsCommand<AppDeployCommand>
                 // valid
                 break;
             default:
-                Logger?.LogError("Only DFU versions 0.10 and 0.11 are supported");
-                return;
+                throw new CommandException("Only DFU versions 0.10 and 0.11 are supported", CommandExitCode.InvalidParameter);
         }
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
